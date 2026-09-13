@@ -1,0 +1,38 @@
+# --- Secrets: never commit real credentials -------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Agent transcript (uploaded separately as chat_transcript) -------------
+log.txt
+
+# --- Runtime artefacts ------------------------------------------------------
+logs/
+*.jsonl
+code/.cache/
+.cache/
+code.zip
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# --- Quality tooling caches -------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- OS / editor ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
