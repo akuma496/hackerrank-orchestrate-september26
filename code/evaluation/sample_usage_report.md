@@ -6,11 +6,11 @@ Final full-dataset run that produced `output.csv`.
 
 | Metric | Value |
 |---|---|
-| Requests processed | 250 |
+| Requests processed | 25 |
 | LLM provider setting (`BOW_LLM_PROVIDER`) | `none` |
-| Reasoner proposals (deterministic, no tokens) | 250 |
+| Reasoner proposals (deterministic, no tokens) | 25 |
 | Fallback rows (not_recommended) | 0 |
-| Wall-clock duration | 5679 ms |
+| Wall-clock duration | 420 ms |
 
 ## Per-model usage
 

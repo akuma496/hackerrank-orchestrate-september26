@@ -54,26 +54,45 @@ def verify_proposal(
     )
     selected = proposal.selected_candidate_id
     if selected != expected:
-        issues.append(_error(IssueCode.RANKING_VIOLATION, OutputColumn.RECOMMENDED_PAYMENT_METHOD,
-                             "selected plan is not the top-ranked eligible plan"))
+        issues.append(
+            _error(
+                IssueCode.RANKING_VIOLATION,
+                OutputColumn.RECOMMENDED_PAYMENT_METHOD,
+                "selected plan is not the top-ranked eligible plan",
+            )
+        )
     if selected is None:
         if decision.recommended_payment_method is not PaymentMethod.NOT_RECOMMENDED:
-            issues.append(_error(IssueCode.ELIGIBILITY_VIOLATION,
-                                 OutputColumn.RECOMMENDED_PAYMENT_METHOD,
-                                 "a payment was recommended without a viable plan"))
+            issues.append(
+                _error(
+                    IssueCode.ELIGIBILITY_VIOLATION,
+                    OutputColumn.RECOMMENDED_PAYMENT_METHOD,
+                    "a payment was recommended without a viable plan",
+                )
+            )
     else:
         chosen = evaluations[selected]
         candidate = chosen.candidate
         if not chosen.is_safe:
-            issues.append(_error(IssueCode.BALANCE_BELOW_MINIMUM, OutputColumn.PAYMENT_PLAN,
-                                 "selected plan breaches the minimum balance"))
+            issues.append(
+                _error(
+                    IssueCode.BALANCE_BELOW_MINIMUM,
+                    OutputColumn.PAYMENT_PLAN,
+                    "selected plan breaches the minimum balance",
+                )
+            )
         if (
             candidate.method is not decision.recommended_payment_method
             or candidate.plan != decision.payment_plan
             or candidate.spending_changes != decision.spending_changes_needed
         ):
-            issues.append(_error(IssueCode.ELIGIBILITY_VIOLATION, OutputColumn.PAYMENT_PLAN,
-                                 "decision does not reproduce the selected plan"))
+            issues.append(
+                _error(
+                    IssueCode.ELIGIBILITY_VIOLATION,
+                    OutputColumn.PAYMENT_PLAN,
+                    "decision does not reproduce the selected plan",
+                )
+            )
 
     errors = tuple(issue for issue in issues if issue.severity is IssueSeverity.ERROR)
     verification = DecisionVerificationOutput(

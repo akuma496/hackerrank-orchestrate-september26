@@ -32,21 +32,41 @@ class ReasoningAgent:
             excluded,
         )
         trace = (
-            ReActStep(thought="reconstruct_cash_ledger", action=ToolName.NORMALIZE_LEDGER,
-                      observation_digest=run.ledger.digest()),
-            ReActStep(thought="detect_supported_recurrence", action=ToolName.DETECT_RECURRENCE,
-                      observation_digest=run.recurrence.digest()),
-            ReActStep(thought="simulate_baseline_trajectory", action=ToolName.FORECAST_BALANCES,
-                      observation_digest=run.baseline_forecast.digest()),
-            ReActStep(thought="measure_safe_lump_sum", action=ToolName.COMPUTE_SAFE_AMOUNT,
-                      observation_digest=run.safe_amount.digest()),
-            ReActStep(thought="find_first_safe_full_date",
-                      action=ToolName.FIND_EARLIEST_FULL_PAYMENT_DATE,
-                      observation_digest=run.earliest_full_payment.digest()),
-            ReActStep(thought="simulate_and_rank_viable_plans", action=ToolName.RANK_PLANS,
-                      observation_digest=run.ranking.digest()),
-            ReActStep(thought="render_grounded_explanation", action=ToolName.RENDER_EXPLANATION,
-                      observation_digest=run.decision.digest()),
+            ReActStep(
+                thought="reconstruct_cash_ledger",
+                action=ToolName.NORMALIZE_LEDGER,
+                observation_digest=run.ledger.digest(),
+            ),
+            ReActStep(
+                thought="detect_supported_recurrence",
+                action=ToolName.DETECT_RECURRENCE,
+                observation_digest=run.recurrence.digest(),
+            ),
+            ReActStep(
+                thought="simulate_baseline_trajectory",
+                action=ToolName.FORECAST_BALANCES,
+                observation_digest=run.baseline_forecast.digest(),
+            ),
+            ReActStep(
+                thought="measure_safe_lump_sum",
+                action=ToolName.COMPUTE_SAFE_AMOUNT,
+                observation_digest=run.safe_amount.digest(),
+            ),
+            ReActStep(
+                thought="find_first_safe_full_date",
+                action=ToolName.FIND_EARLIEST_FULL_PAYMENT_DATE,
+                observation_digest=run.earliest_full_payment.digest(),
+            ),
+            ReActStep(
+                thought="simulate_and_rank_viable_plans",
+                action=ToolName.RANK_PLANS,
+                observation_digest=run.ranking.digest(),
+            ),
+            ReActStep(
+                thought="render_grounded_explanation",
+                action=ToolName.RENDER_EXPLANATION,
+                observation_digest=run.decision.digest(),
+            ),
         )
         return ReasonerProposal(
             request_id=context.request_id,

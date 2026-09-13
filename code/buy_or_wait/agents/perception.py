@@ -58,36 +58,69 @@ def _rx(pattern: str) -> re.Pattern[str]:
 
 
 MESSAGE_RULES: Final[tuple[MessageRule, ...]] = (
-    MessageRule(EvidenceKind.SALARY_CHANGE,
-                _rx(r"salary has increased to|Gaji bulanan Anda naik menjadi|Regular salary of"),
-                _rx(_AMOUNT), _rx(_DATE)),
-    MessageRule(EvidenceKind.TEMPORARY_SALARY_CHANGE,
-                _rx(r"temporary monthly pay is|next salary is reduced to|Gaji bulanan sementara"),
-                _rx(_AMOUNT)),
-    MessageRule(EvidenceKind.SALARY_DATE_CHANGE,
-                _rx(r"salary is now expected on|diperkirakan masuk pada"), None, _rx(_DATE)),
-    MessageRule(EvidenceKind.FIRST_SALARY_CONFIRMED,
-                _rx(r"first salary|Gaji pertama"), _rx(_AMOUNT), _rx(_DATE)),
-    MessageRule(EvidenceKind.INCOME_SOURCE_REDUCED,
-                _rx(r"remaining confirmed monthly salary is|Sisa gaji bulanan yang dikonfirmasi"),
-                _rx(_AMOUNT)),
-    MessageRule(EvidenceKind.BASE_SALARY_CONFIRMED,
-                _rx(r"confirmed base salary is|Gaji pokok yang dikonfirmasi"), _rx(_AMOUNT)),
-    MessageRule(EvidenceKind.BASE_SALARY_CONFIRMED,
-                _rx(r"regular salary for the next payroll is|Gaji rutin Anda untuk penggajian"),
-                _rx(_AMOUNT)),
-    MessageRule(EvidenceKind.ONE_TIME_INCOME_ADJUSTMENT,
-                _rx(r"one-time arrears adjustment of|penyesuaian tunggakan satu kali sebesar"),
-                _rx(r"(?:arrears adjustment of|satu kali sebesar) (" + _AMOUNT + ")")),
-    MessageRule(EvidenceKind.INCOME_ENDED,
-                _rx(r"employment has ended|seasonal contract has ended|Kontrak musiman saat ini "
-                    r"telah berakhir|Hubungan kerja Anda telah berakhir")),
-    MessageRule(EvidenceKind.CONFIRMED_INVOICE_SETTLEMENT,
-                _rx(r"approved an invoice payment of|pembayaran faktur sebesar"),
-                _rx(_AMOUNT), _rx(_DATE)),
-    MessageRule(EvidenceKind.RECURRING_EXPENSE_CHANGE,
-                _rx(r"increases monthly rent by|menaikkan biaya sewa bulanan sebesar"),
-                None, None, _rx(_PERCENT)),
+    MessageRule(
+        EvidenceKind.SALARY_CHANGE,
+        _rx(r"salary has increased to|Gaji bulanan Anda naik menjadi|Regular salary of"),
+        _rx(_AMOUNT),
+        _rx(_DATE),
+    ),
+    MessageRule(
+        EvidenceKind.TEMPORARY_SALARY_CHANGE,
+        _rx(r"temporary monthly pay is|next salary is reduced to|Gaji bulanan sementara"),
+        _rx(_AMOUNT),
+    ),
+    MessageRule(
+        EvidenceKind.SALARY_DATE_CHANGE,
+        _rx(r"salary is now expected on|diperkirakan masuk pada"),
+        None,
+        _rx(_DATE),
+    ),
+    MessageRule(
+        EvidenceKind.FIRST_SALARY_CONFIRMED,
+        _rx(r"first salary|Gaji pertama"),
+        _rx(_AMOUNT),
+        _rx(_DATE),
+    ),
+    MessageRule(
+        EvidenceKind.INCOME_SOURCE_REDUCED,
+        _rx(r"remaining confirmed monthly salary is|Sisa gaji bulanan yang dikonfirmasi"),
+        _rx(_AMOUNT),
+    ),
+    MessageRule(
+        EvidenceKind.BASE_SALARY_CONFIRMED,
+        _rx(r"confirmed base salary is|Gaji pokok yang dikonfirmasi"),
+        _rx(_AMOUNT),
+    ),
+    MessageRule(
+        EvidenceKind.BASE_SALARY_CONFIRMED,
+        _rx(r"regular salary for the next payroll is|Gaji rutin Anda untuk penggajian"),
+        _rx(_AMOUNT),
+    ),
+    MessageRule(
+        EvidenceKind.ONE_TIME_INCOME_ADJUSTMENT,
+        _rx(r"one-time arrears adjustment of|penyesuaian tunggakan satu kali sebesar"),
+        _rx(r"(?:arrears adjustment of|satu kali sebesar) (" + _AMOUNT + ")"),
+    ),
+    MessageRule(
+        EvidenceKind.INCOME_ENDED,
+        _rx(
+            r"employment has ended|seasonal contract has ended|Kontrak musiman saat ini "
+            r"telah berakhir|Hubungan kerja Anda telah berakhir"
+        ),
+    ),
+    MessageRule(
+        EvidenceKind.CONFIRMED_INVOICE_SETTLEMENT,
+        _rx(r"approved an invoice payment of|pembayaran faktur sebesar"),
+        _rx(_AMOUNT),
+        _rx(_DATE),
+    ),
+    MessageRule(
+        EvidenceKind.RECURRING_EXPENSE_CHANGE,
+        _rx(r"increases monthly rent by|menaikkan biaya sewa bulanan sebesar"),
+        None,
+        None,
+        _rx(_PERCENT),
+    ),
 )
 
 
@@ -132,9 +165,15 @@ def propose_message_claims(message: Message) -> list[EvidenceClaim]:
             "date_quote": _quote(rule.when, text),
             "percentage_quote": _quote(rule.percent, text),
         }
-        needed = [name for name, pattern in (("amount_quote", rule.amount),
-                                             ("date_quote", rule.when),
-                                             ("percentage_quote", rule.percent)) if pattern]
+        needed = [
+            name
+            for name, pattern in (
+                ("amount_quote", rule.amount),
+                ("date_quote", rule.when),
+                ("percentage_quote", rule.percent),
+            )
+            if pattern
+        ]
         if any(quotes[name] is None for name in needed):
             continue  # malformed or unexpected wording: ignore rather than guess
         claims.append(
@@ -273,8 +312,11 @@ class PerceptionAgent:
             resolved.append(evidence)
             if used_fallback and evidence.related_event_id is not None:
                 fallback_ids.append(evidence.related_event_id)
-        ignored = tuple(sorted(m.message_id for m, batch in zip(messages, message_claims, strict=True)
-                               if not batch))
+        ignored = tuple(
+            sorted(
+                m.message_id for m, batch in zip(messages, message_claims, strict=True) if not batch
+            )
+        )
         return PerceptionResult(
             request_id=request.request_id,
             claims=tuple(sorted(claims, key=lambda c: c.claim_id)),
@@ -299,22 +341,27 @@ class PerceptionAgent:
         if self._vision is not None and path.is_file():
             try:
                 line = await self._vision.transcribe_amount_line(path)
-            except Exception:  # noqa: BLE001 - any provider failure means conservative fallback
+            except Exception:
                 line = None
             amount = parse_transcribed_amount(line) if line else None
         if amount is not None:
-            return self._document(image, event, amount, QuoteVerification.IMAGE_TRANSCRIPTION,
-                                  "vision"), False
+            return self._document(
+                image, event, amount, QuoteVerification.IMAGE_TRANSCRIPTION, "vision"
+            ), False
         fallback = worst_case_historical_amount(event, context.events)
         if fallback is None:
             return None, False
-        return self._document(image, event, fallback, QuoteVerification.NOT_APPLICABLE,
-                              "worst_case"), True
+        return self._document(
+            image, event, fallback, QuoteVerification.NOT_APPLICABLE, "worst_case"
+        ), True
 
     @staticmethod
     def _document(
-        image: ImageRecord, event: FinancialEvent, amount: Decimal,
-        verification: QuoteVerification, method: str,
+        image: ImageRecord,
+        event: FinancialEvent,
+        amount: Decimal,
+        verification: QuoteVerification,
+        method: str,
     ) -> ResolvedEvidence:
         return ResolvedEvidence(
             claim_id=f"{image.image_id}:{method}",
@@ -326,4 +373,3 @@ class PerceptionAgent:
             currency=event.currency,
             verification=verification,
         )
-

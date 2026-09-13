@@ -73,7 +73,10 @@ class DatasetRepository:
             images[image.user_id].append(image)
         rates = tuple(
             sorted(
-                (ExchangeRate.model_validate(row) for row in read_rows(root / "exchange_rates.csv")),
+                (
+                    ExchangeRate.model_validate(row)
+                    for row in read_rows(root / "exchange_rates.csv")
+                ),
                 key=lambda r: (r.rate_date, r.from_currency.value, r.to_currency.value),
             )
         )

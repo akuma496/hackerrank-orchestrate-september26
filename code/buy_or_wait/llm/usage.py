@@ -27,7 +27,8 @@ class ModelUsage:
         input_price, output_price = PRICES_PER_MILLION.get(self.model, (Decimal(0), Decimal(0)))
         with decimal_policy():
             return (
-                Decimal(self.input_tokens) * input_price + Decimal(self.output_tokens) * output_price
+                Decimal(self.input_tokens) * input_price
+                + Decimal(self.output_tokens) * output_price
             ) / Decimal(1_000_000)
 
 
