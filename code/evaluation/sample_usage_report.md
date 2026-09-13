@@ -7,23 +7,23 @@ Final full-dataset run that produced `output.csv`.
 | Metric | Value |
 |---|---|
 | Requests processed | 25 |
-| LLM provider setting (`BOW_LLM_PROVIDER`) | `none` |
+| LLM provider setting (`BOW_LLM_PROVIDER`) | `anthropic` |
 | Reasoner proposals (deterministic, no tokens) | 25 |
 | Fallback rows (not_recommended) | 0 |
-| Wall-clock duration | 420 ms |
+| Wall-clock duration | 423 ms |
 
 ## Per-model usage
 
 | Provider | Model | Model calls | Cache hits | Input tokens | Output tokens | Total tokens | Estimated cost |
 |---|---|---|---|---|---|---|---|
-| none | none | 0 | 0 | 0 | 0 | 0 | $0.000000 |
+| anthropic | `claude-opus-5` | 0 | 5 | 0 | 0 | 0 | $0.000000 |
 
 ## Overall totals
 
 | Metric | Value |
 |---|---|
 | Model calls | 0 |
-| Cached responses reused | 0 |
+| Cached responses reused | 5 |
 | Input tokens | 0 |
 | Output tokens | 0 |
 | Total tokens | 0 |
