@@ -8,6 +8,7 @@ from quality.gates import (
     check_schema_contracts,
     check_secrets,
     scan_engine,
+    scan_entrypoints,
     scan_secrets_in_text,
 )
 
@@ -70,3 +71,13 @@ def test_settings_hide_secrets(tmp_path: Path) -> None:
     assert settings.anthropic_api_key is not None
     assert settings.anthropic_api_key.get_secret_value() == fake_key
     assert settings.forecast_horizon_days == 90
+
+
+def test_determinism_gate_bans_every_clock_variant() -> None:
+    source = "import time\nstart = time.perf_counter_ns()\nlater = time.monotonic_ns()\n"
+    details = {violation.detail for violation in check_determinism(source, "sample.py")}
+    assert details == {".perf_counter_ns() call", ".monotonic_ns() call"}
+
+
+def test_entrypoints_pass_static_gates() -> None:
+    assert scan_entrypoints() == []

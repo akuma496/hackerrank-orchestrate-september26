@@ -9,7 +9,6 @@ import asyncio
 import csv
 import io
 import os
-import time
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +20,7 @@ from buy_or_wait.data.loader import DatasetRepository
 from buy_or_wait.engine.plans import build_payment_schedule
 from buy_or_wait.observability.structured_logging import (
     LogLevel,
+    Stopwatch,
     get_logger,
     log_event,
     request_context,
@@ -71,7 +71,7 @@ class BatchRunner:
         self._semaphore = asyncio.Semaphore(max(1, concurrency))
 
     async def run(self) -> BatchResult:
-        started = time.perf_counter_ns()
+        stopwatch = Stopwatch()
         outcomes = await asyncio.gather(
             *(self._one(request_id) for request_id in self._repository.request_order)
         )
@@ -83,7 +83,7 @@ class BatchRunner:
         violations = validate_file(OUTPUT_COLUMNS, result.rows, self._repository.request_order)
         if violations:
             raise OutputValidationError(violations)
-        result.duration_ms = (time.perf_counter_ns() - started) // 1_000_000
+        result.duration_ms = stopwatch.elapsed_ms()
         return result
 
     async def _one(self, request_id: str) -> tuple[dict[str, str], str | None, int]:
@@ -96,9 +96,13 @@ class BatchRunner:
                     schedules = installment_schedules(context)
                     problems = validate_row(final.csv_row, context, schedules, self._horizon_days)
                     if not problems:
-                        reason = (
-                            FallbackReason.VERIFICATION_LIMIT.value if final.fallback_used else None
-                        )
+                        reason: str | None = None
+                        if final.fallback_used:
+                            reason = (
+                                FallbackReason.VERIFICATION_LIMIT.value
+                                if final.proposals
+                                else "missing_obligation_amount"
+                            )
                         return final.csv_row, reason, final.proposals
                     log_event(
                         _LOG,

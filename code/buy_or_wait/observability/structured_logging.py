@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import sys
+import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -87,6 +88,16 @@ class LogLevel(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
+
+
+class Stopwatch:
+    """Elapsed wall time for log fields only; never feeds a financial computation."""
+
+    def __init__(self) -> None:
+        self._started = time.perf_counter_ns()
+
+    def elapsed_ms(self) -> int:
+        return (time.perf_counter_ns() - self._started) // 1_000_000
 
 
 class DisallowedLogFieldError(ValueError):

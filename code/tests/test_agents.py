@@ -185,3 +185,14 @@ def test_malformed_vision_output_falls_back(samples: DatasetRepository) -> None:
     assert read.image_fallback_event_ids == ()
     (document,) = [r for r in read.evidence.resolved if r.kind is EvidenceKind.DOCUMENT_AMOUNT]
     assert document.amount == Decimal("2854.00")
+
+
+def test_unknown_future_bill_forces_conservative_fallback(repository: DatasetRepository) -> None:
+    context = repository.context_for("request_73")
+    perception = asyncio.run(PerceptionAgent(DATASET_DIR).run(context))
+    assert perception.unresolved_obligation_event_ids == ("event_6859",)
+    final, planner = asyncio.run(_graph().run(context))
+    assert planner.phase is PlannerPhase.FAILED
+    assert final.proposals == 0
+    assert final.decision.recommended_payment_method is PaymentMethod.NOT_RECOMMENDED
+    assert final.decision.amount_safe_to_pay == Decimal(0)

@@ -270,6 +270,22 @@ def worst_case_historical_amount(
     return max(amounts) if amounts else None
 
 
+def unresolved_obligations(
+    context: UserFinancialContext, documented_event_ids: frozenset[str]
+) -> tuple[str, ...]:
+    """Future debits (pending or scheduled) with a blank amount and no usable evidence."""
+    return tuple(
+        sorted(
+            event.event_id
+            for event in context.events
+            if event.amount is None
+            and event.direction is Direction.DEBIT
+            and event.status in {EventStatus.PENDING, EventStatus.SCHEDULED}
+            and event.event_id not in documented_event_ids
+        )
+    )
+
+
 def parse_transcribed_amount(line: str) -> Decimal | None:
     numbers = _BARE_NUMBER.findall(line)
     if len(numbers) != 1:
@@ -312,6 +328,11 @@ class PerceptionAgent:
             resolved.append(evidence)
             if used_fallback and evidence.related_event_id is not None:
                 fallback_ids.append(evidence.related_event_id)
+        documented = frozenset(
+            r.related_event_id
+            for r in resolved
+            if r.kind is EvidenceKind.DOCUMENT_AMOUNT and r.related_event_id is not None
+        )
         ignored = tuple(
             sorted(
                 m.message_id for m, batch in zip(messages, message_claims, strict=True) if not batch
@@ -327,6 +348,7 @@ class PerceptionAgent:
             ),
             ignored_message_ids=ignored,
             image_fallback_event_ids=tuple(sorted(fallback_ids)),
+            unresolved_obligation_event_ids=unresolved_obligations(context, documented),
         )
 
     async def _image_evidence(

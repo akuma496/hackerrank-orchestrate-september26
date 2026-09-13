@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 import pytest
 
@@ -294,3 +294,51 @@ def test_sample_calibration_does_not_regress(dataset: Dataset) -> None:
         )
     assert status >= 16
     assert earliest >= 16
+
+
+def _ledger_for(
+    dataset: Dataset, request_id: str
+) -> tuple[NormalizeLedgerOutput, dict[str, FinancialEvent]]:
+    context = dataset.context_for(request_id)
+    ledger = normalize_ledger(
+        NormalizeLedgerInput(
+            request_id=request_id,
+            request_date=context.request.request_date,
+            home_currency=context.profile.home_currency,
+            events=context.events,
+            resolved_evidence=(),
+            exchange_rates=context.exchange_rates,
+        )
+    )
+    return ledger, {event.event_id: event for event in context.events}
+
+
+def test_blank_amounts_never_become_zero(dataset: Dataset) -> None:
+    blank_ids = {event.event_id for event in dataset.events if event.amount is None}
+    assert len(blank_ids) == 16
+    seen = set()
+    for request_id in dataset.requests:
+        ledger, _ = _ledger_for(dataset, request_id)
+        assert not blank_ids & {entry.event_id for entry in ledger.entries}
+        reasons = {item.event_id: item.reason for item in ledger.exclusions}
+        for event_id in blank_ids & set(reasons):
+            assert reasons[event_id] is ExclusionReason.UNRESOLVED_AMOUNT
+            seen.add(event_id)
+    assert seen == blank_ids
+
+
+def test_every_foreign_amount_uses_the_exact_date_rate(dataset: Dataset) -> None:
+    rates = rate_index(dataset.rates)
+    converted = 0
+    for request_id in dataset.requests:
+        ledger, events = _ledger_for(dataset, request_id)
+        home = dataset.context_for(request_id).profile.home_currency
+        for entry in ledger.entries:
+            if entry.amount_source is AmountSource.FX_CONVERSION:
+                event = events[entry.event_id]
+                assert event.amount is not None
+                rate = rates[(event.cash_date, event.currency, home)]
+                expected = (event.amount * rate).quantize(Decimal("0.01"), ROUND_HALF_EVEN)
+                assert entry.amount == expected
+                converted += 1
+    assert converted == 139

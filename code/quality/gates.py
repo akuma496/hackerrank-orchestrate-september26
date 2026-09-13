@@ -31,7 +31,20 @@ CLOCK_ALLOWED_DIR: Final[str] = "observability"
 BANNED_FLOAT_MODULES: Final[frozenset[str]] = frozenset({"math", "statistics", "numpy", "pandas"})
 NONDETERMINISTIC_MODULES: Final[frozenset[str]] = frozenset({"random", "secrets", "uuid"})
 NONDETERMINISTIC_CALLS: Final[frozenset[str]] = frozenset(
-    {"now", "utcnow", "today", "time", "time_ns", "monotonic", "perf_counter", "urandom"}
+    {
+        "now",
+        "utcnow",
+        "today",
+        "time",
+        "time_ns",
+        "monotonic",
+        "monotonic_ns",
+        "perf_counter",
+        "perf_counter_ns",
+        "process_time",
+        "process_time_ns",
+        "urandom",
+    }
 )
 NETWORK_MODULES: Final[frozenset[str]] = frozenset(
     {
@@ -292,8 +305,21 @@ def check_schema_contracts() -> list[Violation]:
     return violations
 
 
+def scan_entrypoints() -> list[Violation]:
+    """CLI and evaluation scripts obey the same float, clock, and network rules."""
+    files = [CODE_ROOT / "main.py", *sorted((CODE_ROOT / "evaluation").glob("*.py"))]
+    violations: list[Violation] = []
+    for file_path in files:
+        source = file_path.read_text(encoding="utf-8")
+        path = _relative(file_path)
+        violations.extend(check_float_ban(source, path))
+        violations.extend(check_determinism(source, path))
+        violations.extend(check_network_isolation(source, path, is_llm_gateway=False))
+    return violations
+
+
 def run_all() -> list[Violation]:
-    return [*scan_engine(), *check_secrets(), *check_schema_contracts()]
+    return [*scan_engine(), *scan_entrypoints(), *check_secrets(), *check_schema_contracts()]
 
 
 def main() -> int:

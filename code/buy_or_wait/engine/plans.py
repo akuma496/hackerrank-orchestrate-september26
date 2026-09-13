@@ -220,7 +220,12 @@ def search_spending_changes(payload: SpendingChangeSearchInput) -> SpendingChang
             chosen.append(change)
             current = evaluation
             with decimal_policy():
-                savings += expense.current_amount - (change.new_amount or Decimal(0))
+                remaining = (
+                    Decimal(0) if change.action is SpendingAction.STOP else change.new_amount
+                )
+                if remaining is None:
+                    raise ValueError("reduce_to changes always carry a new amount")
+                savings += expense.current_amount - remaining
     found = current.is_safe and bool(chosen)
     return SpendingChangeSearchOutput(
         request_id=payload.request_id,

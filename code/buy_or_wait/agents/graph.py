@@ -11,7 +11,6 @@ reflection budget. The only branching point is :func:`route_after_verification`,
 of the state. A fourth proposal is structurally impossible: the reflection budget is two.
 """
 
-import time
 from typing import Final, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -27,7 +26,13 @@ from buy_or_wait.agents.fallback import FallbackReason, fallback_decision
 from buy_or_wait.agents.perception import PerceptionAgent
 from buy_or_wait.agents.reasoner import ReasoningAgent
 from buy_or_wait.agents.verifier import VerificationAgent
-from buy_or_wait.observability.structured_logging import get_logger, log_event, request_context
+from buy_or_wait.observability.structured_logging import (
+    LogLevel,
+    Stopwatch,
+    get_logger,
+    log_event,
+    request_context,
+)
 from buy_or_wait.schemas.base import StrictModel
 from buy_or_wait.schemas.enums import (
     AgentRole,
@@ -50,6 +55,7 @@ RECURSION_LIMIT: Final[int] = 40
 _LOG = get_logger("agents.graph")
 
 Route = Literal["output", "reflect", "fallback"]
+PerceptionRoute = Literal["reasoner", "fallback"]
 
 
 class GraphState(TypedDict, total=False):
@@ -60,6 +66,7 @@ class GraphState(TypedDict, total=False):
     verdict: VerifierVerdict
     excluded: tuple[str, ...]
     final: FinalDecision
+    fallback_reason: FallbackReason
 
 
 def _call(
@@ -85,6 +92,13 @@ def _direct(
             step=state.step, phase=state.phase, next_agent=agent, tool=tool, reason=reason
         )
     )
+
+
+def route_after_perception(state: GraphState) -> PerceptionRoute:
+    """Unknown future obligations make every forecast unsafe: go straight to the fallback."""
+    if state["perception"].unresolved_obligation_event_ids:
+        return "fallback"
+    return "reasoner"
 
 
 def route_after_verification(state: GraphState) -> Route:
@@ -114,7 +128,11 @@ class AffordabilityGraph:
         builder.add_node("output", self._output)
         builder.add_edge(START, "planner")
         builder.add_edge("planner", "perception")
-        builder.add_edge("perception", "reasoner")
+        builder.add_conditional_edges(
+            "perception",
+            route_after_perception,
+            {"reasoner": "reasoner", "fallback": "fallback"},
+        )
         builder.add_edge("reasoner", "verifier")
         builder.add_conditional_edges(
             "verifier",
@@ -128,7 +146,7 @@ class AffordabilityGraph:
 
     async def run(self, context: UserFinancialContext) -> tuple[FinalDecision, PlannerState]:
         with request_context(context.request_id):
-            started = time.perf_counter_ns()
+            stopwatch = Stopwatch()
             result = await self._graph.ainvoke(
                 {"context": context, "excluded": ()}, config={"recursion_limit": RECURSION_LIMIT}
             )
@@ -142,7 +160,7 @@ class AffordabilityGraph:
                     "status": "fallback" if final.fallback_used else "verified",
                     "attempt": final.proposals,
                     "reflection_used": planner.reflection.used,
-                    "duration_ms": (time.perf_counter_ns() - started) // 1_000_000,
+                    "duration_ms": stopwatch.elapsed_ms(),
                     "output_digest": final.decision.digest(),
                 },
             )
@@ -320,16 +338,31 @@ class AffordabilityGraph:
 
     async def _fallback(self, state: GraphState) -> GraphState:
         context, planner = state["context"], state["planner"]
-        safe = planner.artifacts.safe_amount
-        earliest = planner.artifacts.earliest_full_payment
-        decision = fallback_decision(
-            context,
-            FallbackReason.VERIFICATION_LIMIT,
-            safe.amount_safe_to_pay if safe is not None else None,
-            earliest.earliest_date if earliest is not None else None,
-        )
-        planner = _direct(planner, AgentRole.PLANNER, None, RoutingReason.ABORT_TO_SAFE_FALLBACK)
-        return {"planner": planner.fail_safe(TransitionReason.REFLECTION_LIMIT_REACHED, decision)}
+        if planner.phase is PlannerPhase.EVIDENCE_RESOLVED:
+            reason = FallbackReason.PROCESSING_ERROR
+            transition = TransitionReason.UNRECOVERABLE_ERROR
+            decision = fallback_decision(context, reason)
+            log_event(
+                _LOG,
+                "fallback.missing_obligation_amount",
+                level=LogLevel.WARNING,
+                fields={"record_count": len(state["perception"].unresolved_obligation_event_ids)},
+            )
+        else:
+            safe = planner.artifacts.safe_amount
+            earliest = planner.artifacts.earliest_full_payment
+            planner = _direct(
+                planner, AgentRole.PLANNER, None, RoutingReason.ABORT_TO_SAFE_FALLBACK
+            )
+            reason = FallbackReason.VERIFICATION_LIMIT
+            transition = TransitionReason.REFLECTION_LIMIT_REACHED
+            decision = fallback_decision(
+                context,
+                reason,
+                safe.amount_safe_to_pay if safe is not None else None,
+                earliest.earliest_date if earliest is not None else None,
+            )
+        return {"planner": planner.fail_safe(transition, decision), "fallback_reason": reason}
 
     # -- output: exact CSV rendering of the terminal decision --------------------------
     async def _output(self, state: GraphState) -> GraphState:

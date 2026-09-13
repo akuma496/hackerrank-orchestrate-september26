@@ -25,6 +25,8 @@ class PerceptionResult(StrictModel):
     evidence: ResolveEvidenceOutput
     ignored_message_ids: tuple[str, ...] = ()
     image_fallback_event_ids: tuple[str, ...] = ()
+    unresolved_obligation_event_ids: tuple[str, ...] = ()
+    """Pending/scheduled debits whose amount is still unknown (never assumed to be zero)."""
 
     @model_validator(mode="after")
     def _same_request(self) -> Self:
